@@ -48,10 +48,13 @@ export default {
         sourceMap: !production,
         defaults: {
           script: 'typescript',
-          style: 'stylus',
         },
-        stylus: {
-          prependData: `@import "src/variables.styl"`,
+        postcss: {
+          plugins: [
+            require('tailwindcss'),
+            require('autoprefixer'),
+            require('postcss-nesting'),
+          ],
         },
       }),
       compilerOptions: {
