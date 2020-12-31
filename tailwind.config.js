@@ -9,6 +9,8 @@ module.exports = {
   //   require('@tailwindcss/ui'),
   // ],
   purge: {
+    enabled: production,
+    mode: 'all',
     content: [
       './src/**/*.svelte',
       './public/**/*.html',
@@ -16,8 +18,13 @@ module.exports = {
     css: [
       './public/**/*.css',
     ],
-    enabled: production,
+    options: {
+      whitelistPatterns: [/svelte-/],
+      defaultExtractor: (content) =>
+        [...content.matchAll(/(?:class:)*([\w\d-/:%.]+)/gm)].map(([_match, group, ..._rest]) => group),
+    },
   },
+  darkMode: false,
   variants: {
     extend: {
       boxShadow: ['focus-within'],
