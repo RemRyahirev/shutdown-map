@@ -1,6 +1,7 @@
 import { readable } from 'svelte/store';
 
 import type { TData, TMapCoords, TRegion, TRegionMap } from '../types';
+import { DataGroup } from '../types';
 
 type TCostMap = Record<string, Pick<TRegion,
   | 'vrp'
@@ -144,6 +145,54 @@ const codesCoordsMap: Record<number, TMapCoords> = {
   65: [17, 2], // SAK
 };
 
+function buildRating<T, K extends keyof T>(
+  map: Record<string, T>,
+  field: K,
+): Record<string, { position: number; group: DataGroup }> {
+  const positions: Array<{ key: string } & Pick<T, K>> = [];
+  let total = 0;
+  for (const [key, item] of Object.entries(map)) {
+    const value = item[field] as unknown as number;
+    positions.push({ key, [field]: value } as { key: string } & Pick<T, K>);
+    total += value;
+  }
+
+  positions.sort((a, b) => {
+    const aVal = a[field] as unknown as number;
+    const bVal = b[field] as unknown as number;
+
+    if (bVal === aVal) {
+      return 0;
+    }
+
+    return bVal > aVal ? 1 : -1;
+  });
+
+  const positionsMap: Record<string, { position: number; group: DataGroup }> = {};
+  let subtotal = 0;
+  for (let iLen = positions.length, i = 0; i < iLen; ++i) {
+    const item = positions[i];
+    const value = item[field] as unknown as number;
+    subtotal += value;
+
+    let group: DataGroup;
+    if (i === 0 || subtotal < total / 3) {
+      group = DataGroup.High;
+    } else if (i === iLen - 1 || subtotal >= 2 * total / 3) {
+      group = DataGroup.Low;
+    } else {
+      group = DataGroup.Medium;
+    }
+
+    positionsMap[item.key] = {
+      position: i,
+      group,
+    };
+  }
+
+  return positionsMap;
+}
+
 async function loadSheet(url): Promise<string[][]> {
   const response = await fetch(url);
 
@@ -210,7 +259,7 @@ async function loadStore({ cost, fear, codes }): Promise<TData> {
 
   const fearMap: TFearMap = fear
     .slice(1)
-    .reduce((map, [num, name, key, code, population, vrp, mobile, weight, users, wide, speed, licenses, border, atlas, ix, resistance]) => {
+    .reduce((map, [num, name, key, code, population, vrp, mobile, weight, users, fixed, wide, speed256, speed5, speed20, speed100, speed, companies, licenses, _licenses, border, _border, atlas, _atlas, ix, resistance]) => {
       map[key] = {
         mobileWeight: Number(weight),
         mobileUsers: Number(users),
@@ -226,21 +275,8 @@ async function loadStore({ cost, fear, codes }): Promise<TData> {
       return map;
     }, {});
 
-  const costPositions = Object.entries(costMap)
-    .map(([key, { cost }]) => ({ key, cost }));
-  costPositions.sort((a, b) => a.cost - b.cost);
-  const costPositionsMap = costPositions.reduce((map, { key, cost }, i) => {
-    map[key] = i;
-    return map;
-  }, {} as Record<string, number>);
-
-  const fearPositions = Object.entries(fearMap)
-    .map(([key, { resistance }]) => ({ key, resistance }));
-  fearPositions.sort((a, b) => a.resistance - b.resistance);
-  const fearPositionsMap = fearPositions.reduce((map, { key, resistance }, i) => {
-    map[key] = i;
-    return map;
-  }, {} as Record<string, number>);
+  const costPositionsMap = buildRating(costMap, 'cost');
+  const fearPositionsMap = buildRating(fearMap, 'resistance');
 
   const regions = codes
     .slice(3)
@@ -255,9 +291,11 @@ async function loadStore({ cost, fear, codes }): Promise<TData> {
         ...fearMap[key],
 
         map: codesCoordsMap[key],
-        costPosition: costPositionsMap[key],
-        resistancePosition: fearPositionsMap[key],
-      };
+        costPosition: costPositionsMap[key].position,
+        costGroup: costPositionsMap[key].group,
+        resistancePosition: fearPositionsMap[key].position,
+        resistanceGroup: fearPositionsMap[key].group,
+      } as TRegion;
 
       return map;
     }, {} as TRegionMap);

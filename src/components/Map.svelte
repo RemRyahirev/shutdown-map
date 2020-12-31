@@ -1,12 +1,18 @@
 <script lang="ts">
-import type { TRegion } from '../types';
-import { DataType } from '../types';
+import { flip } from 'svelte/animate';
+import { fade } from 'svelte/transition';
+import { quintOut, linear, cubicInOut, expoInOut, quintInOut } from 'svelte/easing';
 
+import type { TRegion } from '../types';
+import { DataType, MapView } from '../types';
+
+import { format } from '../utils';
 import { data } from '../stores/data';
 
 import MapItem from './MapItem.svelte';
 
 export let dataType: DataType;
+export let mapView: MapView;
 export let multiplier = 1;
 let selected: string | null = null;
 
@@ -22,8 +28,32 @@ let entries: Array<[string, TRegion]>;
 $: entries = $data.isLoaded && Object.entries($data.regions);
 $: cols = $data.cols;
 $: rows = $data.rows;
-$: coordsMap = entries && entries.reduce((map, [key, item]) => {
-  map[item.map.join(' ')] = key;
+$: arr = new Array(rows * cols).fill('');
+$: regionsLen = $data.regions ? Object.keys($data.regions).length : $data.regionCoords?.length;
+$: regionsPosition = !$data.isLoaded && $data.regionCoords.map(str => {
+  const [col, row] = str.split(' ');
+  return row * cols + col;
+});
+$: positionMap = entries && entries.reduce((map, [key, item]) => {
+  let pos = dataType === DataType.Cost ? item.costPosition : item.resistancePosition;
+
+  switch (mapView) {
+    case MapView.Map:
+      pos = item.map[1] * cols + item.map[0];
+      break;
+
+    case MapView.Asc:
+      pos = regionsLen - pos - 1;
+      break;
+
+    case MapView.Desc:
+      break;
+
+    default:
+      return map;
+  }
+
+  map[pos] = key;
   return map;
 }, {});
 $: activeRegion = selected && $data?.regions?.[selected];
@@ -34,22 +64,26 @@ $: activeRegion = selected && $data?.regions?.[selected];
     class="grid justify-center gap-1"
     style={`grid-template-columns: repeat(${cols}, ${size}px); grid-auto-rows: ${size}px;`}
   >
-    {#each new Array(rows).fill('') as _, row}
-      {#each new Array(cols).fill('') as _, col}
+    {#each arr as _, position (positionMap[position] ?? position)}
+      <div
+        class="flex flex-col"
+      >
         {#if !$data.isLoaded}
-          <MapItem loading={$data.regionCoords.includes(`${col} ${row}`)} />
-        {:else if coordsMap[`${col} ${row}`]}
           <MapItem
-            item={$data.regions[coordsMap[`${col} ${row}`]]}
+            loading={regionsPosition.includes(position)}
+          />
+        {:else if positionMap[position]}
+          <MapItem
+            item={$data.regions[positionMap[position]]}
             dataType={dataType}
             multiplier={multiplier}
-            active={$data.regions[coordsMap[`${col} ${row}`]].key === selected}
-            on:click={handleClick($data.regions[coordsMap[`${col} ${row}`]].key)}
+            active={$data.regions[positionMap[position]].key === selected}
+            on:click={handleClick($data.regions[positionMap[position]].key)}
           />
         {:else}
           <MapItem />
         {/if}
-      {/each}
+      </div>
     {/each}
   </div>
 
@@ -63,7 +97,7 @@ $: activeRegion = selected && $data?.regions?.[selected];
         </div>
 
         <div class="ml-8 font-bold">
-          {$data.totalCost} млрд. руб.
+          {format($data.totalCost * multiplier)} млрд. руб.
         </div>
       {:else if activeRegion}
         <div>
@@ -72,9 +106,9 @@ $: activeRegion = selected && $data?.regions?.[selected];
 
         <div class="ml-8 font-bold">
           {#if dataType === DataType.Cost}
-            {activeRegion.cost} млн. руб.
+            {format(activeRegion.cost  * multiplier)} млн. руб.
           {:else}
-            {activeRegion.resistance}
+            {format(activeRegion.resistance)}
           {/if}
         </div>
       {/if}

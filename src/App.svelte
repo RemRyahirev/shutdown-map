@@ -2,7 +2,7 @@
 import { fly } from 'svelte/transition';
 import { quintOut } from 'svelte/easing';
 
-import { CostType, DataType } from './types';
+import { CostType, DataType, MapView } from './types';
 import { data } from './stores/data';
 
 import Map from './components/Map.svelte';
@@ -36,6 +36,13 @@ function handleBodyClick(e: any) {
 }
 
 let isMobileType = false;
+
+let mapView: MapView = MapView.Map;
+function setView(newView: MapView) {
+  return () => {
+    mapView = newView;
+  };
+}
 
 $: types = $data?.costTypes ?? [];
 $: costType = isMobileType ? CostType.Mobile : CostType.Full;
@@ -97,28 +104,68 @@ $: multiplier = (hours / 24 + days) * (isMobileType ? 0.5 : 1);
     {/if}
   </h2>
 
-  <div
-    class="flex mb-8 items-center"
-    class:invisible={type === DataType.Resistance}
-  >
-    <Switch
-      offText="Полный"
-      onText="Мобильный"
-      bind:checked={isMobileType}
-    />
+  <div class="flex mb-8 items-center">
+    <div class="flex flex-row items-center mr-16">
+      <button
+        class="flex justify-center items-center px-4 py-2 border border-gray-400 rounded-l cursor-pointer focus:outline-none"
+        class:hover:bg-gray-300={mapView !== MapView.Map}
+        class:bg-gray-400={mapView === MapView.Map}
+        disabled={mapView === MapView.Map}
+        on:click={setView(MapView.Map)}
+      >
+        Map
+      </button>
 
-    <div class="flex flex-row items-center ml-16">
+      <button
+        class="flex justify-center items-center px-4 py-2 border border-l-0 border-r-0 border-gray-400 cursor-pointer focus:outline-none"
+        class:hover:bg-gray-300={mapView !== MapView.Asc}
+        class:bg-gray-400={mapView === MapView.Asc}
+        disabled={mapView === MapView.Asc}
+        on:click={setView(MapView.Asc)}
+      >
+        Asc
+      </button>
+
+      <button
+        class="flex justify-center items-center px-4 py-2 border border-gray-400 rounded-r cursor-pointer focus:outline-none"
+        class:hover:bg-gray-300={mapView !== MapView.Desc}
+        class:bg-gray-400={mapView === MapView.Desc}
+        disabled={mapView === MapView.Desc}
+        on:click={setView(MapView.Desc)}
+      >
+        Desc
+      </button>
+    </div>
+
+    <div
+      class="flex flex-row items-center mr-16"
+      class:invisible={type === DataType.Resistance}
+    >
+      <Switch
+        offText="Полный"
+        onText="Мобильный"
+        bind:checked={isMobileType}
+      />
+    </div>
+
+    <div
+      class="flex flex-row items-center mr-8"
+      class:invisible={type === DataType.Resistance}
+    >
       <span class="pr-4">Дни</span>
       <InputNumber bind:value={days} />
     </div>
 
-    <div class="flex flex-row items-center ml-8">
+    <div
+      class="flex flex-row items-center"
+      class:invisible={type === DataType.Resistance}
+    >
       <span class="pr-4">Часы</span>
       <InputNumber bind:value={hours} />
     </div>
   </div>
 
-  <Map dataType={type} multiplier={multiplier} />
+  <Map dataType={type} mapView={mapView} multiplier={multiplier} />
 </main>
 
 <style global lang="postcss">

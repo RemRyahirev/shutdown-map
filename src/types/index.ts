@@ -1,5 +1,11 @@
 export type TMapCoords = [number, number];
 
+export enum DataGroup {
+  High,
+  Medium,
+  Low,
+}
+
 export type TRegion = {
   key: string;
   name: string;
@@ -22,7 +28,9 @@ export type TRegion = {
 
   map: TMapCoords;
   costPosition: number;
+  costGroup: DataGroup;
   resistancePosition: number;
+  resistanceGroup: DataGroup;
 };
 
 export type TRegionMap = Record<string, TRegion>;
